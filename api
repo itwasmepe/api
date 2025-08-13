@@ -1,0 +1,36 @@
+// api/aliexpress.js
+import crypto from "crypto";
+
+export default async function handler(req, res) {
+  const { keywords } = req.query;
+
+  const APP_KEY = process.env.ALIEXPRESS_APP_KEY;     // zet in Vercel → Settings → Environment Variables
+  const APP_SECRET = process.env.ALIEXPRESS_APP_SECRET;
+  const TRACKING_ID = process.env.ALIEXPRESS_TRACKING_ID; // optioneel
+
+  // API parameters
+  const params = {
+    app_key: APP_KEY,
+    tracking_id: TRACKING_ID,
+    keywords: keywords || "electronics",
+    format: "json",
+    sign_method: "md5",
+    timestamp: new Date().toISOString().replace("T", " ").split(".")[0],
+  };
+
+  // Sorteer parameters alfabetisch voor signatuur
+  const sortedParams = Object.keys(params).sort().map(k => `${k}${params[k]}`).join("");
+  const signString = APP_SECRET + sortedParams + APP_SECRET;
+  const sign = crypto.createHash("md5").update(signString).digest("hex").toUpperCase();
+
+  const url = `https://api.aliexpress.com/item_search?${Object.entries(params)
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&")}&sign=${sign}`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({ error: "Fout bij ophalen AliExpress producten" });
+  }
+}
